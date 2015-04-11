@@ -1,6 +1,7 @@
 package com.herokuapp.ezhao.timezone;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -10,7 +11,8 @@ import android.view.MotionEvent;
 import android.view.View;
 
 public class TimezoneView extends View {
-    private Paint testPaint;
+    private int startingHour;
+    private Paint textPaint;
     private Paint tickPaint;
     private Paint purplePaint;
     private Paint bluePaint;
@@ -23,9 +25,17 @@ public class TimezoneView extends View {
     public TimezoneView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        testPaint = new Paint();
-        testPaint.setColor(Color.WHITE);
-        testPaint.setTextSize(24);
+        TypedArray typedArray = getContext().getTheme().obtainStyledAttributes(attrs, R.styleable.TimezoneView, 0, 0);
+        try {
+            startingHour = typedArray.getInt(R.styleable.TimezoneView_startingHour, 0);
+            startingHour %= 24;
+        } finally {
+            typedArray.recycle();
+        }
+
+        textPaint = new Paint();
+        textPaint.setColor(Color.WHITE);
+        textPaint.setTextSize(24);
 
         tickPaint = new Paint();
         tickPaint.setStyle(Paint.Style.STROKE);
@@ -53,10 +63,10 @@ public class TimezoneView extends View {
 
         float WIDTH = getWidth();
         float HEIGHT = getHeight();
-        int tickPadding = 42; // bit of space on either side
+        int tickPadding = 42; // space on either side
         int textPaddingSide = 8;
         int textPaddingTop = 40;
-        float spacing = (3 * WIDTH - 2 * tickPadding) / 24;
+        float hourWidth = (3 * WIDTH - 2 * tickPadding) / 24;
 
         float newOffset = motionMoveX - motionStartX;
         float hiddenAmount = WIDTH - (currentOffset + newOffset);
@@ -67,49 +77,59 @@ public class TimezoneView extends View {
 
         // Background colors
         positionX = tickPadding - hiddenAmount;
-        canvas.drawRect(positionX - tickPadding, 0.0f, positionX + 6 * spacing, HEIGHT, purplePaint);
-        canvas.drawRect(positionX + 6 * spacing, 0.0f, positionX + 9 * spacing, HEIGHT, bluePaint);
-        canvas.drawRect(positionX + 9 * spacing, 0.0f, positionX + 16 * spacing, HEIGHT, greenPaint);
-        canvas.drawRect(positionX + 16 * spacing, 0.0f, positionX + 20 * spacing, HEIGHT, bluePaint);
-        canvas.drawRect(positionX + 20 * spacing, 0.0f, positionX +tickPadding + 24 * spacing, HEIGHT, purplePaint);
+        Paint[] paints = new Paint[] {purplePaint, bluePaint, greenPaint, bluePaint, purplePaint};
+        int[] paintChangeTimes = new int[] {6 - startingHour, 10 - startingHour, 16 - startingHour, 20 - startingHour};
+
+        // TODO (emily) need if statements and paint buckets for other startingHours
+        if (startingHour >= 6) {
+            paints = new Paint[] {purplePaint, bluePaint, greenPaint, bluePaint, purplePaint};
+            paintChangeTimes = new int[] {6 - startingHour, 10 - startingHour, 16 - startingHour, 20 - startingHour};
+        }
+
+        for (int i = 0; i < paintChangeTimes.length; i++) {
+            if (i == 0) {
+                canvas.drawRect(positionX - tickPadding, 0.0f, positionX + paintChangeTimes[i] * hourWidth, HEIGHT, paints[i]);
+            } else {
+                canvas.drawRect(positionX + paintChangeTimes[i-1] * hourWidth, 0.0f, positionX + paintChangeTimes[i] * hourWidth, HEIGHT, paints[i]);
+            }
+
+            if (i == paintChangeTimes.length - 1) {
+                canvas.drawRect(positionX + paintChangeTimes[i] * hourWidth, 0.0f, positionX + tickPadding + 24 * hourWidth, HEIGHT, paints[i+1]);
+            }
+        }
 
         // Labels on the hours
         int displayHour;
         String displaySuffix;
         String displayString;
 
-        for (int i = 0; i <= 24; i++) {
-            displayHour = i;
+        for (int i = startingHour; i <= startingHour + 24; i++) {
             displaySuffix = "AM";
-            if (i >= 12) {
-                displayHour = i - 12;
+            if (i % 24 >= 12) {
                 displaySuffix = "PM";
             }
-            if (displayHour == 0) {
+            displayHour = i % 12;
+            if (i % 12 == 0) {
                 displayHour = 12;
-            }
-            if (i == 24) {
-                displayHour = 12;
-                displaySuffix = "AM";
             }
 
             displayString = String.valueOf(displayHour) + displaySuffix;
-            positionX = i * spacing + textPaddingSide - hiddenAmount;
-            canvas.drawText(displayString, positionX, textPaddingTop, testPaint);
+            positionX = (i - startingHour) * hourWidth + textPaddingSide - hiddenAmount;
+            canvas.drawText(displayString, positionX, textPaddingTop, textPaint);
         }
 
         // Tickmarks
         if (tickMarks == null) {
             tickMarks = new Path();
             for (int i = 0; i <= 8; i++) {
-                positionX = i * spacing;
+                positionX = i * hourWidth;
                 tickMarks.moveTo(positionX, HEIGHT * 0.3f);
                 tickMarks.lineTo(positionX, HEIGHT);
-                tickMarks.moveTo(positionX + spacing / 2, HEIGHT * 0.6f);
-                tickMarks.lineTo(positionX + spacing / 2, HEIGHT);
+                tickMarks.moveTo(positionX + hourWidth / 2, HEIGHT * 0.6f);
+                tickMarks.lineTo(positionX + hourWidth / 2, HEIGHT);
             }
         }
-        float tickMarksOffset = (tickPadding - hiddenAmount) % spacing;
+        float tickMarksOffset = (tickPadding - hiddenAmount) % hourWidth;
         tickMarks.offset(tickMarksOffset, 0.0f);
         canvas.drawPath(tickMarks, tickPaint);
         tickMarks.offset(-1.0f * tickMarksOffset, 0.0f);
