@@ -42,7 +42,7 @@ public class TimezoneView extends View {
         float spacing = (3 * WIDTH - 2 * tickPadding) / 24;
 
         float newOffset = motionMoveX - motionStartX;
-        float hiddenAmount = getWidth() - (currentOffset + newOffset);
+        float hiddenAmount = WIDTH - (currentOffset + newOffset);
         hiddenAmount = Math.max(hiddenAmount, 0.0f);
         hiddenAmount = Math.min(hiddenAmount, WIDTH * 2.0f);
 
@@ -71,15 +71,20 @@ public class TimezoneView extends View {
             canvas.drawText(displaySuffix, positionX, topPadding, testPaint);
         }
 
-        tickMarks = new Path();
-        for (int i = 0; i <= 24; i++) {
-            positionX = i * spacing + tickPadding - hiddenAmount;
-            tickMarks.moveTo(positionX, topPadding);
-            tickMarks.lineTo(positionX, HEIGHT);
-            tickMarks.moveTo(positionX + spacing / 2, topPadding);
-            tickMarks.lineTo(positionX + spacing / 2, HEIGHT / 2);
+        if (tickMarks == null) {
+            tickMarks = new Path();
+            for (int i = 0; i <= 8; i++) {
+                positionX = i * spacing;
+                tickMarks.moveTo(positionX, topPadding);
+                tickMarks.lineTo(positionX, HEIGHT);
+                tickMarks.moveTo(positionX + spacing / 2, topPadding);
+                tickMarks.lineTo(positionX + spacing / 2, HEIGHT / 2);
+            }
         }
+        float tickMarksOffset = (tickPadding - hiddenAmount) % spacing;
+        tickMarks.offset(tickMarksOffset, 0.0f);
         canvas.drawPath(tickMarks, tickPaint);
+        tickMarks.offset(-1.0f * tickMarksOffset, 0.0f);
     }
 
     @Override
